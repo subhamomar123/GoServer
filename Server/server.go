@@ -9,7 +9,7 @@ import (
 
 func main() {
 	http.HandleFunc("/api/cmd", handleCommand)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8080", addCorsHeaders(http.DefaultServeMux)))
 }
 
 func handleCommand(w http.ResponseWriter, r *http.Request) {
@@ -24,11 +24,11 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cmdParts := strings.Fields(cmdStr) // Split the command string into parts
-	cmd := exec.Command(cmdParts[0], cmdParts[1:]...)
+	cmd := exec.Command("cmd", "/C", cmdParts[0], cmdParts[1:]...)
 	output, err := cmd.Output()
 
 	if err != nil {
-		// 	If the command execution failed, return an error response
+		// If the command execution failed, return an error response
 		if exitErr, ok := err.(*exec.ExitError); ok {
 			http.Error(w, exitErr.Error(), http.StatusInternalServerError)
 		} else {
@@ -39,4 +39,20 @@ func handleCommand(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(output)
+}
+
+func addCorsHeaders(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add the necessary CORS headers to allow requests from any origin
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		// Handle preflight (OPTIONS) requests
+		if r.Method == http.MethodOptions {
+			return
+		}
+
+		handler.ServeHTTP(w, r)
+	})
 }
